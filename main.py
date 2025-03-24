@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.fftpack import dctn
 
-
 def rgb2ycrcb(bmp_image):
     Y_Cb_Cr = np.empty((bmp_image.height, bmp_image.width, 3))
 
@@ -60,9 +59,9 @@ inp_image = Image.open( 'file/test16.bmp' )
 
 # turn to ycryb
 ycrcb = rgb2ycrcb(inp_image)
-print(ycrcb[:8,:8,1 ].round().astype(int))
+# print(ycrcb[:8,:8,1 ].round().astype(int))
 
-print("----------------")
+# print("----------------")
 # spilt to 8x8 block
 Y_channel_8x8,Cb_channel_8x8,Cr_channel_8x8 = cut2block(ycrcb)
 #print(cut2block(ycrcb)[0].round().astype(int))
@@ -158,12 +157,112 @@ def RLC(list):
                 continue
             zero_count += 1
             continue
-        result.append((zero_count,i))
+        result.append((zero_count,int(i)))
         zero_count = 0
     # todo case All zero and last not zero
     result.append((0,0))
     return result
 
-print(y64[0])
-for i in RLC(y64[2]):
-    print(i)    
+# print(y64[0])
+y_ac_RLC = []
+cb_ac_RLC = []
+cr_ac_RLC = []
+for i in y64:
+    y_ac_RLC.append(RLC(i))
+for i in cb64:
+    cb_ac_RLC.append(RLC(i))
+for i in cr64:
+    cr_ac_RLC.append(RLC(i))
+
+# 1 complement
+
+def bit_need(n):
+    magnitude = (int( np.ceil( np.log2(np.abs(n) + 1) ) ))
+    return (magnitude)
+        
+
+def one_complement(n):
+    if n == 0:
+        return ""
+    else:
+        return bin(n)[2:] if n > 0 else bin(int(bit_need(n)*"1",2)^np.abs(n))[2:].zfill(bit_need(n))
+
+
+# for i in range(0,10):
+#     print(str(i)+":"+str(one_complement(i)))
+
+# for i in range(0,-10,-1):
+#     print(str(i)+":"+str(one_complement(i)))
+
+
+
+# huffman
+# DC
+import file.buildHT as buildHT
+
+y_DC_huff = []
+cb_DC_huff = []
+cr_DC_huff = []
+
+def huffman(n,i):
+    result = (buildHT.buildHT(buildHT.ht_default)[i][bit_need(n)])+one_complement(int(n))
+    return result
+
+
+for i in y_DC:
+    y_DC_huff.append(huffman(i,0))
+
+for l,lc in zip([cb_DC,cr_DC],[cb_DC_huff,cr_DC_huff]):
+    for i in l:
+        lc.append(huffman(i,2))
+
+#AC
+
+def to_sk(r,a):
+    return r * 16 + bit_need(a)
+def huffman_AC(n,i):
+    result = (buildHT.buildHT(buildHT.ht_default)[i][to_sk(n[0],n[1])])+one_complement(int(n[1]))
+    return result
+
+y_aC_huff = []
+cb_aC_huff = []
+cr_aC_huff = []
+
+for i in y_ac_RLC:
+    l = []
+    for j in i:
+        l.append(huffman_AC(j,1))
+    y_aC_huff.append(l)
+
+for i in cb_ac_RLC:
+    l = []
+    for j in i:
+        l.append(huffman_AC(j,3))
+    cb_aC_huff.append(l)
+
+for i in cr_ac_RLC:
+    l = []
+    for j in i:
+        l.append(huffman_AC(j,3))
+    cr_aC_huff.append(l)
+
+
+# encode
+
+final_result = ""
+
+for i in range(len(y_DC_huff)):
+
+    final_result += y_DC_huff[i]
+    for j in y_aC_huff[i]:
+        final_result += j
+    final_result += cb_DC_huff[i]
+    for j in cb_aC_huff[i]:
+        final_result += j
+    final_result += cr_DC_huff[i]
+    for j in cr_aC_huff[i]:
+        final_result += j
+print(final_result)
+
+
+
