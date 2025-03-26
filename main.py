@@ -64,7 +64,7 @@ def cut2block(Y_Cb_Cr):
 # main
 start_time = time.time()    
 
-inp_image = Image.open( 'file/fish.bmp' )
+inp_image = Image.open( 'file/girl.bmp' )
 ycrcb = rgb2ycrcb(inp_image)
 # turn to ycryb
 
@@ -211,7 +211,7 @@ def one_complement(n):
 #     print(str(i)+":"+str(one_complement(i)))
 
 
-
+huffman_start_time = time.time()
 # huffman
 # DC
 import file.buildHT as buildHT
@@ -262,9 +262,10 @@ for i in cr_ac_RLC:
         l.append(huffman_AC(j,3))
     cr_aC_huff.append(l)
 
+huffman_used_time = time.time() - huffman_start_time
+
 
 # encode
-
 final_result = ""
 
 for i in range(len(y_DC_huff)):
@@ -278,10 +279,12 @@ for i in range(len(y_DC_huff)):
     final_result += cr_DC_huff[i]
     for j in cr_aC_huff[i]:
         final_result += j
-        
+
+
 print(final_result)
 print(len(final_result))
 print(f"Time: {time.time() - start_time} seconds")
 print(f"Zip Time: {zip_used_time} seconds")
+print(f"Huffman Time: {huffman_used_time} seconds")
 
 
