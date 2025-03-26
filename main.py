@@ -2,6 +2,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.fftpack import dctn
+import time
 
 def rgb2ycrcb(bmp_image):
     Y_Cb_Cr = np.empty((bmp_image.height, bmp_image.width, 3))
@@ -35,36 +36,46 @@ def ycrcb2rgb(bmp_image):
 def cut2block(Y_Cb_Cr):
 
     inp_width, inp_height = inp_image.size
+    print(Y_Cb_Cr.shape)
     if inp_height % 8 != 0 or inp_width % 8 != 0:
-        #todo: padding
-        pass
+        # Padding
+        pad_height = 8 - (inp_height % 8) if inp_height % 8 != 0 else 0
+        pad_width = 8 - (inp_width % 8) if inp_width % 8 != 0 else 0
+        Y_Cb_Cr = np.pad(Y_Cb_Cr, ((0, pad_height), (0, pad_width), (0, 0)), mode='constant', constant_values=0)
 
-    Yi= np.empty((int(inp_width/8) * int(inp_height/8), 8, 8))
-    Cb= np.empty((int(inp_width/8) * int(inp_height/8), 8, 8))
-    Cr= np.empty((int(inp_width/8) * int(inp_height/8), 8, 8))
+    Yi = np.zeros((round(inp_width / 8) * round(inp_height / 8), 8, 8))
+    Cb = np.zeros((round(inp_width / 8) * round(inp_height / 8), 8, 8))
+    Cr = np.zeros((round(inp_width / 8) * round(inp_height / 8), 8, 8))
 
-    for i_raw in range(0,int(inp_width/8)):
-        for i_col in range(0,int(inp_height/8)):
-            Yi[i_raw*int(inp_height/8) + i_col] = (Y_Cb_Cr[i_raw*8:i_raw*8+8,i_col*8:i_col*8+8,0])
-            Cb[i_raw*int(inp_height/8) + i_col] = (Y_Cb_Cr[i_raw*8:i_raw*8+8,i_col*8:i_col*8+8,1])
-            Cr[i_raw*int(inp_height/8) + i_col] = (Y_Cb_Cr[i_raw*8:i_raw*8+8,i_col*8:i_col*8+8,2])
-            #print(Y_Cb_Cr_r[i_raw*int(inp_height/8) + i_col][0])
-            
-    return Yi,Cb,Cr
+    for i_raw in range(0, round(inp_width / 8)):
+        for i_col in range(0, round(inp_height / 8)):
+            try:
+                Yi[i_raw * round(inp_height / 8) + i_col] = (Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 0])
+                Cb[i_raw * round(inp_height / 8) + i_col] = (Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 1])
+                Cr[i_raw * round(inp_height / 8) + i_col] = (Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 2])
+            except:
+                print(Yi[i_raw * round(inp_height / 8) + i_col])
+                print(Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 0])
+
+    return Yi, Cb, Cr
 
 
 
 # main
-inp_image = Image.open( 'file/test16.bmp' )
+start_time = time.time()    
 
-# turn to ycryb
+inp_image = Image.open( 'file/fish.bmp' )
 ycrcb = rgb2ycrcb(inp_image)
-# print(ycrcb[:8,:8,1 ].round().astype(int))
+# turn to ycryb
 
+# print(ycrcb[:8,:8,1 ].round().astype(int))
+print(cut2block(ycrcb)[0])
+print(cut2block(ycrcb)[0][0].shape)
 # print("----------------")
 # spilt to 8x8 block
 Y_channel_8x8,Cb_channel_8x8,Cr_channel_8x8 = cut2block(ycrcb)
 #print(cut2block(ycrcb)[0].round().astype(int))
+
 
 # turn Y channel to -128~128
 Y_channel_8x8 -= 128
@@ -106,6 +117,7 @@ lable = [
     [21,34,37,47,50,56,59,61],
     [35,36,48,49,57,58,62,63]
 ]
+lable2 = [(0,0),(0,1),(1,0),(2,0),(1,1),(0,2),(0,3),(1,2),(2,1),(3,0),(4,0),(3,1),(2,2),(1,3),(0,4),(0,5),(1,4),(2,3),(3,2),(4,1),(5,0),(6,0),(5,1),(4,2),(3,3),(2,4),(1,5),(0,6),(0,7),(1,6),(2,5),(3,4),(4,3),(5,2),(6,1),(7,0),(7,1),(6,2),(5,3),(4,4),(3,5),(2,6),(1,7),(2,7),(3,6),(4,5),(5,4),(6,3),(7,2),(7,3),(6,4),(5,5),(4,6),(3,7),(4,7),(5,6),(6,5),(7,4),(7,5),(6,6),(5,7),(6,7),(7,6),(7,7)]
 
 def zigzag(block):
     result = np.empty(64)
@@ -114,13 +126,17 @@ def zigzag(block):
             result[lable[i][j]] = block[i][j]
     return result
 
+
+
 y64,cb64,cr64 = [],[],[]
 
+zip_start_time = time.time()
 for i in range(len(qy)):
     y64.append(zigzag(qy[i]))
     cb64.append(zigzag(qcb[i]))
     cr64.append(zigzag(qcr[i]))
-
+print("Time: ",time.time() - zip_start_time)
+zip_used_time = time.time() - zip_start_time
 # DPCM
 
 y64_DC = []
@@ -262,7 +278,10 @@ for i in range(len(y_DC_huff)):
     final_result += cr_DC_huff[i]
     for j in cr_aC_huff[i]:
         final_result += j
+        
 print(final_result)
-
+print(len(final_result))
+print(f"Time: {time.time() - start_time} seconds")
+print(f"Zip Time: {zip_used_time} seconds")
 
 
