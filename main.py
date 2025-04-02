@@ -89,8 +89,8 @@ for yc,cbc,crc in zip(Y_channel_8x8,Cb_channel_8x8,Cr_channel_8x8):
     y_dcted.append(dctn(yc, norm='ortho',axes=(0,1)))
     Cr_dcted.append(dctn(crc, norm='ortho',axes=(0,1)))
     Cb_dcted.append(dctn(cbc, norm='ortho',axes=(0,1)))
-
-#print(Cr_dcted[3].round().astype(int))
+print(Cr_channel_8x8[3])
+print(Cr_dcted[3].round().astype(int))
     
 # Quantization
 from file.quantizedTable import quantizedTable

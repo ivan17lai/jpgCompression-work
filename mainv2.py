@@ -43,6 +43,36 @@ def adjustSize(nparray):
         nparray = np.pad(nparray, ((0, pad_height), (0, pad_width), (0, 0)), mode='constant', constant_values=0)
     return nparray
 
+def cut2block(Y_Cb_Cr):
+
+
+    inp_width, inp_height = inp_image.size
+    #print(Y_Cb_Cr.shape)
+    if inp_height % 8 != 0 or inp_width % 8 != 0:
+        # Padding
+        pad_height = 8 - (inp_height % 8) if inp_height % 8 != 0 else 0
+        pad_width = 8 - (inp_width % 8) if inp_width % 8 != 0 else 0
+        Y_Cb_Cr = np.pad(Y_Cb_Cr, ((0, pad_height), (0, pad_width), (0, 0)), mode='constant', constant_values=0)
+
+    Yi = np.zeros((round(inp_width / 8) * round(inp_height / 8), 8, 8))
+    Cb = np.zeros((round(inp_width / 8) * round(inp_height / 8), 8, 8))
+    Cr = np.zeros((round(inp_width / 8) * round(inp_height / 8), 8, 8))
+
+    for i_raw in range(0, round(inp_width / 8)):
+        for i_col in range(0, round(inp_height / 8)):
+            try:
+                Yi[i_raw * round(inp_height / 8) + i_col] = (Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 0])
+                Cb[i_raw * round(inp_height / 8) + i_col] = (Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 1])
+                Cr[i_raw * round(inp_height / 8) + i_col] = (Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 2])
+            except Exception as e:
+                print("Error:", e)
+                print(Yi[i_raw * round(inp_height / 8) + i_col])
+                print(Y_Cb_Cr[i_raw * 8:i_raw * 8 + 8, i_col * 8:i_col * 8 + 8, 0])
+                time.sleep(10)
+
+
+    return Yi, Cb, Cr
+
 #4
 lable = [
     [0,1,5,6,14,15,27,28],
@@ -75,6 +105,7 @@ def bit_need(n):
     return (magnitude)
         
 def to_lcomp(n):
+    n = int(n)
     if n == 0:
         return ""
     else:
@@ -112,6 +143,11 @@ def runlenEn(zig):
         result.append((zero_count,int(i)))
         zero_count = 0
     if zero_count != 0:
+        while True:
+            if result[-1] == (15,0):
+                result.pop()
+            else:
+                break
         result.append((0,0))
     return result
 
@@ -156,9 +192,12 @@ def to_sk(r,a):
     return r * 16 + bit_need(a)
 
 def acEn(acHT, run_ac):
+    # print(run_ac)
+    # print("AC:")
     result = ""
     for r,a in run_ac:
         result += acHT[to_sk(r,a)]+to_lcomp(a)
+        #print(acHT[to_sk(r,a)]+to_lcomp(a))
     return result
 
 def acDe(acHT, ac_code):
@@ -182,13 +221,95 @@ def acDe(acHT, ac_code):
 
 # print(acEn(acLHT, [(0,9),(7,12),(9,4),(0,15),(3,1),(0,0)]))
 # print(acDe(acLHTd,'101110011111111110101111110011111111101111111001011111111101011010'))
+
+
+
+# main
 from file.quantizedTable import quantizedTable
 lumQT,chrQT = quantizedTable(55)
 
-
+start_time = time.time()
 inp_image = Image.open( 'file/girl.bmp' )
+ycrycb = rgb2ycrcb(inp_image)
+ycrcb_resize = adjustSize(ycrycb)
+block_yc,block_crc,block_cbc = cut2block(ycrcb_resize)
+block_yc -= 128
+
+y_dcted = []
+Cr_dcted = []
+Cb_dcted = []
+for yc,cbc,crc in zip(block_yc,block_cbc,block_crc):
+    y_dcted.append(dctn(yc, norm='ortho',axes=(0,1)))
+    Cr_dcted.append(dctn(crc, norm='ortho',axes=(0,1)))
+    Cb_dcted.append(dctn(cbc, norm='ortho',axes=(0,1)))
+
+q_y = []
+q_cb = []
+q_cr = []
+
+for i in range(len(y_dcted)):
+    q_y.append((y_dcted[i]/lumQT).round().astype(int))
+    q_cb.append((Cb_dcted[i]/chrQT).round().astype(int))
+    q_cr.append((Cr_dcted[i]/chrQT).round().astype(int))
+
+zip_y = []
+zip_cb = []
+zip_cr = []
+
+for y,cy,cb in zip(q_y,q_cr,q_cb):
+    zip_y.append(bk2zip(y))
+    zip_cb.append(bk2zip(cy))
+    zip_cr.append(bk2zip(cb))
+    
+
+Dc_y = [(i[0]) for i in zip_y]
+Dc_cb = [i[0] for i in zip_cb]
+Dc_cr = [i[0] for i in zip_cr]
+
+DPCM_y = []
+DPCM_cb = []
+DPCM_cr = []
+
+for i in range(len(Dc_y)):
+    if i == 0:
+        DPCM_y.append(Dc_y[i])
+        DPCM_cb.append(Dc_cb[i])
+        DPCM_cr.append(Dc_cr[i])
+    else:
+        DPCM_y.append(Dc_y[i] - Dc_y[i-1])
+        DPCM_cb.append(Dc_cb[i] - Dc_cb[i-1])
+        DPCM_cr.append(Dc_cr[i] - Dc_cr[i-1])
 
 
+AC_run_y = []
+AC_run_cb = []
+AC_run_cr = []
+for i in range(len(zip_y)):
+    AC_run_y.append(runlenEn(zip_y[i]))
+    AC_run_cb.append(runlenEn(zip_cb[i]))
+    AC_run_cr.append(runlenEn(zip_cr[i]))
 
 
-# 
+DC_huff_y = []
+DC_huff_cb = []
+DC_huff_cr = []
+for i in range(len(DPCM_y)):
+    DC_huff_y.append(dcEn(dcLHT,DPCM_y[i]))
+    DC_huff_cb.append(dcEn(dcCHT,DPCM_cb[i]))
+    DC_huff_cr.append(dcEn(dcCHT,DPCM_cr[i]))
+
+AC_huff_y = []
+AC_huff_cb = []
+AC_huff_cr = []
+for i in range(len(AC_run_y)):
+    AC_huff_y.append(acEn(acLHT,AC_run_y[i]))
+    AC_huff_cb.append(acEn(acCHT,AC_run_cb[i]))
+    AC_huff_cr.append(acEn(acCHT,AC_run_cr[i]))
+
+result = ""
+
+for i in range(len(DC_huff_cb)):
+    result += DC_huff_y[i][0] + AC_huff_y[i] + DC_huff_cb[i][0] + AC_huff_cb[i] + DC_huff_cr[i][0] + AC_huff_cr[i]
+
+print(result)
+print("Time: ",time.time() - start_time)
