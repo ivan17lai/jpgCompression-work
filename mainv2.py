@@ -81,17 +81,114 @@ def to_lcomp(n):
         return bin(n)[2:] if n > 0 else bin(int(bit_need(n)*"1",2)^np.abs(n))[2:].zfill(bit_need(n))
 
 def from_lcomp(n):
+    n = str(n)
     if n == "":
         return 0
     else:
-        return int("0b"+n,2)
-    
-print(to_lcomp(-123),to_lcomp(0),to_lcomp(-1),to_lcomp(2))
-print(from_lcomp("0000100"),from_lcomp(""),from_lcomp(0),from_lcomp(10))
+        if n[0] == "1":
+            return int(n,2)
+        else:
+            return int(int(n,2) ^ int("1"*len(n),2))*-1
+
+# print(to_lcomp(-123),to_lcomp(0),to_lcomp(-1),to_lcomp(2))
+# print(from_lcomp("0000100"),from_lcomp(""),from_lcomp(0),from_lcomp(10))
+
+#6
+def runlenEn(zig):
+    result = []
+    # all zero case
+    if zig[1:].sum() == 0:
+        return [(0,0)]
+
+    zero_count = 0
+    for i in zig[1:]:
+        if i == 0:
+            if zero_count == 15:
+                zero_count = 0
+                result.append((15,0))
+                continue
+            zero_count += 1
+            continue
+        result.append((zero_count,int(i)))
+        zero_count = 0
+    if zero_count != 0:
+        result.append((0,0))
+    return result
+
+def runlenDe(ra):
+    result = [0]
+    for i in ra:
+        if i[0] == 15:
+            result.extend([0]*15)
+        else:
+            result.extend([0]*i[0])
+            result.append(i[1])
+    return np.array(result)
+
+# zig=np.array([9,8,9,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0])
+# print(runlenEn(zig))
+# print(runlenDe(runlenEn(zig)))
 
 
+#7
+import file.buildHT as buildHT
+dcLHT,acLHT,dcCHT,acCHT = buildHT.buildHT(buildHT.ht_default)
+dcLHTd,acLHTd,dcCHTd,acCHTd = buildHT.buildHT(buildHT.ht_default,'decode')
+
+def dcEn(dcHT,dc_diff):
+    result = dcHT[bit_need(dc_diff)]+to_lcomp(dc_diff)
+    return result,len(result)
+
+def dcDe(dcHT, dc_code):
+    for i in range(1, len(dc_code) + 1):
+        prefix = dc_code[:i]
+        if prefix in dcHT:
+            category = dcHT[prefix]
+            lcomp_bits = dc_code[i:i + category]
+            return from_lcomp(lcomp_bits), i + category
+
+
+# print(dcEn(dcLHT, 21),dcEn(dcCHT, -92))
+# print(dcDe(dcLHTd,'11010101'),dcDe(dcCHTd,'11111100100011'))
+
+#8
+def to_sk(r,a):
+    return r * 16 + bit_need(a)
+
+def acEn(acHT, run_ac):
+    result = ""
+    for r,a in run_ac:
+        result += acHT[to_sk(r,a)]+to_lcomp(a)
+    return result
+
+def acDe(acHT, ac_code):
+    result = []
+    i = 0
+    while i < len(ac_code):
+        found = False
+        for j in range(1, 17):
+            prefix = ac_code[i:i + j]
+            if prefix in acHT:
+                val = acHT[prefix]
+                r = val >> 4
+                a = val & 0xF
+                lcomp_bits = ac_code[i + j:i + j + a]
+                result.append((r, from_lcomp(lcomp_bits)))
+                i += j + a
+                found = True
+                break
+    return result
+
+
+# print(acEn(acLHT, [(0,9),(7,12),(9,4),(0,15),(3,1),(0,0)]))
+# print(acDe(acLHTd,'101110011111111110101111110011111111101111111001011111111101011010'))
+from file.quantizedTable import quantizedTable
+lumQT,chrQT = quantizedTable(55)
 
 
 inp_image = Image.open( 'file/girl.bmp' )
-ycrcb = rgb2ycrcb(inp_image)
 
+
+
+
+# 

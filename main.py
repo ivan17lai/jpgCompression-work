@@ -64,7 +64,7 @@ def cut2block(Y_Cb_Cr):
 # main
 start_time = time.time()    
 
-inp_image = Image.open( 'file/girl.bmp' )
+inp_image = Image.open( 'file/test16.bmp' )
 ycrcb = rgb2ycrcb(inp_image)
 # turn to ycryb
 
